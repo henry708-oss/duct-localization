@@ -1,17 +1,17 @@
-
-#define a method for the centroid
-
-#define the carver "Walk"
-    #Bias toward straight
-
-#Create a file
+# procedurally generate 3d maze in a rectangular volume
+#
+# Authored by Zach Strahan
+#
+#
 
 import sys
-import numpy as np
 import random
-import matplotlib.pyplot as plt
 import math
-#import trimesh as tp
+import numpy as np
+import matplotlib.pyplot as plt
+import trimesh as tri
+from skimage import measure
+
 
 #----- BEARING -----
 def GetNewBearing():
@@ -194,8 +194,20 @@ def Bore(matrix, current_pos:list, shape: tuple, mode:int):
     if posX and posY and posZ:
         matrix[current_pos[0]+1,current_pos[1]+1,current_pos[2]+1] = mode
 
+#----- MESH -----
+#adapted from an ai summary, might be buggy
+def CreateMesh(matrix, model_name: str):
+    # Extract surface mesh using Marching Cubes
+    verts, faces, normals, values = measure.marching_cubes(matrix, level=0.5)
 
-#----- VOXELS -----
+    # Create a Trimesh object
+    mesh = tri.Trimesh(vertices=verts, faces=faces, vertex_normals=normals)
+
+    # Export to STL or OBJ (Gazebo supports STL, OBJ, and DAE)
+    outputfile = model_name + ".stl"
+    mesh.export(outputfile)
+
+#----- VOXELS ----- BUGGED
 #taken from an ai summary, might be bugged
 def matrix_to_gazebo_sdf(matrix, voxel_size=0.1, model_name="matrix_solid"):
     """
@@ -244,13 +256,13 @@ def matrix_to_gazebo_sdf(matrix, voxel_size=0.1, model_name="matrix_solid"):
     return full_sdf
 
 #----- VISUALIZER -----
-def Vis(matrix):
-    ####### below taken from google ai summary. Creates a plot visualizer. Turn this into a "vis" func. 
+def Vis(matrix, name, flag):
+    #implementation adapted from a google AI summary
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
 
     # Render the matrix as solid voxels
-    # 'edgecolor' outlines the individual blocks to give a true grid feeling
+    # 'edgecolor': if none, does not render. if 'k' renders grid lines
     # alpha controls transparency. 
     ax.voxels(matrix, edgecolor=None, facecolors='cyan', alpha=0.3)
 
@@ -258,16 +270,19 @@ def Vis(matrix):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    ax.set_title('Carver Demo')
-    plt.show()  
+    ax.set_title("Carver: Test" + name + "Demo")
+    plt.savefig("Test "+name+".png")
+    if flag:
+        plt.show()  
 
 #----- MAIN -----
 #create a matrix using CL args
-if (len(sys.argv)<4):
-    print("To use, input: **python carver.py mat_dim_x mat_y mat_z mode")
-    print("Example: python3 carver.py 30 30 30")
+if (len(sys.argv)<6):
+    print("To use, input: **python carver.py mat_dim_x mat_y mat_z mode name flag")
+    print("Example: python3 carver.py 30 30 30 0 1 0")
     print("x, y, z must be greater than 30")
     print("mode 0 for carver, mode 1 for extruder")
+    print("flag 0 for nothing, flag 1 to show vis")
     sys.exit(1)
 
 x = int(sys.argv[1])
@@ -275,10 +290,22 @@ y = int(sys.argv[2])
 z = int(sys.argv[3])
 mode = int(sys.argv[4]) #if 0, then output is a solid with chennels
                         #if 1, then output is the channels as solids; a "negative" of the map
+testNumber = sys.argv[5]
+displayFlag = int(sys.argv[6])
 
 if (x < 30) or (y < 30) or (z < 30):
     print("Matrix must be at least 30x30x30")
     sys.exit(1)
+
+if mode != 0:
+    if mode != 1:
+        print("Mode argument can only be 0 or 1")
+        sys.exit(1)
+
+if displayFlag != 0:
+    if displayFlag != 1:
+        print("Mode argument can only be 0 or 1")
+        sys.exit(1)
 
 shape = (x,y,x)
 if mode:
@@ -305,7 +332,7 @@ for i in range(5):
 
 running = True
 canTurn = False
-iters = math.floor(x**1.65) 
+iters = math.floor(min(shape)**1.65) 
 print(iters)
 while(running):
     turnBias = random.randint(0,4) #about a %20 chance to fork path on each iteration
@@ -328,4 +355,5 @@ while(running):
 #    f.write(vox_mat)
 #print("SDF file generated successfully as 'model.sdf'!")
 
-Vis(matrix_solid)
+CreateMesh(matrix_solid, "Test " + testNumber)
+Vis(matrix_solid, testNumber, displayFlag)
