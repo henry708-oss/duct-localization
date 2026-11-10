@@ -348,12 +348,5 @@ while(running):
     if iters < 0:
         running = False
 
-
-#voxelize and save to file
-#vox_mat = matrix_to_gazebo_sdf(matrix_solid, voxel_size=.02)   
-#with open("model.sdf", "w") as f:
-#    f.write(vox_mat)
-#print("SDF file generated successfully as 'model.sdf'!")
-
 CreateMesh(matrix_solid, "Test " + testNumber)
 Vis(matrix_solid, testNumber, displayFlag)
