@@ -332,7 +332,7 @@ for i in range(5):
 
 running = True
 canTurn = False
-iters = math.floor(min(shape)**1.65) 
+iters = math.floor(min(shape)**1.65)
 print(iters)
 while(running):
     turnBias = random.randint(0,4) #about a %20 chance to fork path on each iteration
