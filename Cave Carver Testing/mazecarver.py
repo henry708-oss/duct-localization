@@ -206,7 +206,7 @@ def Carve(matrix, mode:int):
     if shape[0] < 30 or shape[1] < 30 or shape[2] < 30:
         return None
 
-    if mode != 0 or mode != 1:
+    if mode != 0 and mode != 1:
         return None
     #create random starting point on the X,Z plane at least 6 voxels in to the solid
     cur_x = random.randint(6, shape[0]-7)
@@ -226,8 +226,8 @@ def Carve(matrix, mode:int):
 
     running = True
     canTurn = False
-    iters = math.floor(min(shape)**1.65)
-    print(iters)
+    iters = math.floor(min(shape)**1.65)#based on visuals, this ration seems good.
+    #print(iters)
     while(running):
         turnBias = random.randint(0,4) #about a %20 chance to fork path on each iteration
         match turnBias:                #creates a bias toward straight channels
