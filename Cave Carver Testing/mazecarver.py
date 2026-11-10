@@ -205,7 +205,9 @@ def Carve(matrix, mode:int):
     shape = np.shape(matrix) # shape[0]=x,[1] = y,[2] = z
     if shape[0] < 30 or shape[1] < 30 or shape[2] < 30:
         return None
-    
+
+    if mode != 0 or mode != 1:
+        return None
     #create random starting point on the X,Z plane at least 6 voxels in to the solid
     cur_x = random.randint(6, shape[0]-7)
     cur_y = 4
