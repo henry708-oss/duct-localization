@@ -2,16 +2,17 @@
 #
 # Authored by Zach Strahan
 #
-#
+# Graph construction logic by Kellen Henry
 
 import sys
+import pickle
 import random
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 import trimesh as tri
 from skimage import measure
-
+import graph as g
 
 #----- BEARING -----
 def _GetNewBearing():
@@ -220,15 +221,46 @@ def Carve(matrix, mode:int):
     set_pos = cur_pos
     #print(cur_pos)
 
+    #add entrance node to graph and seg
+
+    position_string = g.getPositionString(cur_pos)
+    maze_graph = g.Graph({
+            position_string: g.Node(cur_pos.copy())
+            })
+
+    maze_graph.start = maze_graph.dict[position_string]
+
+    #pointer for later use
+    most_recent = maze_graph.dict[position_string]
+
     for i in range(5):
         _Bore(matrix,set_pos,shape, mode)
         set_pos[1]-=1
+
+    #add node following the short path from entrace, only instance where a node thats
+    #not necessarily an intersection is created
+
+    new = g.Node(cur_pos.copy())
+
+    #maybe this is clunky, but adds new node to the node youre departing from and node you're 
+    #approaching seperately 
+    #im just trying to get this code pushed and documented but later ill update this
+    #so that one function call updates the edge for both nodes
+    most_recent.update_edge(3, g.Edge(new, 5), g.DEPARTING)
+    new.update_edge(3, g.Edge(most_recent, 5), g.APPROACHING)
+
+    most_recent = new
 
     running = True
     canTurn = False
     iters = math.floor(min(shape)**1.65)#based on visuals, this ration seems good.
     #print(iters)
     while(running):
+        #keeps track of old position to in order to leave the base code as untouched as possible
+        #If a turn happens will take old position and leave a node there since that is the
+        #actual intersection point
+        old_pos = cur_pos.copy()
+
         turnBias = random.randint(0,4) #about a %20 chance to fork path on each iteration
         match turnBias:                #creates a bias toward straight channels
             case 4:
@@ -237,11 +269,46 @@ def Carve(matrix, mode:int):
                 canTurn = False
             case _:
                 _Walk(cur_pos, canTurn, shape)
+        
         _Bore(matrix, cur_pos, shape, mode)
+
+        #check if a turn happened ie old bearing != new bearing
+        didTurn = False
+        if(old_pos[3] != cur_pos[3]):
+            didTurn = True
+        
+        if (didTurn):
+            #if we turned, add a node at the intersection point to the graph
+            #also check if there's already node there
+            position_string = g.getPositionString(old_pos)
+            if position_string in maze_graph.dict:
+                new = maze_graph.dict[position_string]
+            else:
+                new = g.Node(old_pos.copy())
+                maze_graph.dict[position_string] = new
+
+            #distance needs the shared axis to calculate distance
+            #which is the bearing of old_pos as that is the axis coming from the most recent node
+            dist = g.getDistance(old_pos[3], most_recent.pos, old_pos)
+            most_recent.update_edge(old_pos[3], g.Edge(new, dist), g.DEPARTING)
+            new.update_edge(old_pos[3], g.Edge(most_recent, dist), g.APPROACHING)
+            most_recent = new
+
+        # this is outside a conditional in the case that we turn and place a node at oldpos
+        # but theres also a previously existing node at the place we just walked to
+
+        position_string = g.getPositionString(cur_pos)
+        if position_string in maze_graph.dict:
+            dist = g.getDistance(cur_pos[3], most_recent.pos, cur_pos)
+            most_recent.update_edge(cur_pos[3], g.Edge(maze_graph.dict[position_string], dist), g.DEPARTING)
+            maze_graph.dict[position_string].update_edge(cur_pos[3], g.Edge(most_recent, dist), g.APPROACHING)
+            most_recent = maze_graph.dict[position_string]
+
         iters-=1
         if iters < 0:
             running = False
-    return matrix
+
+    return matrix, maze_graph
 
 #----- MESH -----
 #adapted from an ai summary, might be buggy
