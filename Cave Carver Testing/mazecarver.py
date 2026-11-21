@@ -218,29 +218,26 @@ def Carve(matrix, mode:int):
     #always starts drilling into the cube
     cur_bearing = 3
     cur_pos = [cur_x, cur_y, cur_z, cur_bearing]
-    set_pos = cur_pos
+    set_pos = cur_pos.copy()
     #print(cur_pos)
-
-    #add entrance node to graph and seg
-
-    position_string = g.getPositionString(cur_pos)
-    maze_graph = g.Graph({
-            position_string: g.Node(cur_pos.copy())
-            })
-
-    maze_graph.start = maze_graph.dict[position_string]
-
-    #pointer for later use
-    most_recent = maze_graph.dict[position_string]
 
     for i in range(5):
         _Bore(matrix,set_pos,shape, mode)
         set_pos[1]-=1
 
+    position_string = g.getPositionString(set_pos)
+    maze_graph = g.Graph({
+                position_string: g.Node(set_pos.copy())
+                })
+
+    most_recent = maze_graph.dict[position_string]
+    
     #add node following the short path from entrace, only instance where a node thats
     #not necessarily an intersection is created
 
     new = g.Node(cur_pos.copy())
+
+    maze_graph.start = new
 
     #maybe this is clunky, but adds new node to the node youre departing from and node you're 
     #approaching seperately 
