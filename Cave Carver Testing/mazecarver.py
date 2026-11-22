@@ -222,7 +222,7 @@ def Carve(matrix, mode:int):
     #print(cur_pos)
 
     for i in range(5):
-        _Bore(matrix,set_pos,shape, mode)
+        _Bore(matrix,set_pos, shape, mode)
         set_pos[1]-=1
 
     position_string = g.getPositionString(set_pos)
@@ -231,20 +231,20 @@ def Carve(matrix, mode:int):
                 })
 
     most_recent = maze_graph.dict[position_string]
+
+    maze_graph.start = most_recent
     
     #add node following the short path from entrace, only instance where a node thats
     #not necessarily an intersection is created
 
     new = g.Node(cur_pos.copy())
 
-    maze_graph.start = new
 
     #maybe this is clunky, but adds new node to the node youre departing from and node you're 
     #approaching seperately 
     #im just trying to get this code pushed and documented but later ill update this
     #so that one function call updates the edge for both nodes
-    most_recent.update_edge(3, g.Edge(new, 5), g.DEPARTING)
-    new.update_edge(3, g.Edge(most_recent, 5), g.APPROACHING)
+    most_recent.update_edge(3, g.Edge(new, 5))
 
     most_recent = new
 
@@ -284,11 +284,16 @@ def Carve(matrix, mode:int):
                 new = g.Node(old_pos.copy())
                 maze_graph.dict[position_string] = new
 
+                # i realized we also need to check every axis of the new node for previously carved
+                # paths it may intersect, check axis will do this and update edges accordingly
+                g.checkAxis(matrix, maze_graph, new, 0, mode)
+                g.checkAxis(matrix, maze_graph, new, 1, mode)
+                g.checkAxis(matrix, maze_graph, new, 2, mode)
+
             #distance needs the shared axis to calculate distance
-            #which is the bearing of old_pos as that is the axis coming from the most recent node
+            #which is the bearing of old_pos as that is the axis coming from the most recent met/placed node
             dist = g.getDistance(old_pos[3], most_recent.pos, old_pos)
-            most_recent.update_edge(old_pos[3], g.Edge(new, dist), g.DEPARTING)
-            new.update_edge(old_pos[3], g.Edge(most_recent, dist), g.APPROACHING)
+            most_recent.update_edge(old_pos[3], g.Edge(new, dist))
             most_recent = new
 
         # this is outside a conditional in the case that we turn and place a node at oldpos
@@ -297,8 +302,7 @@ def Carve(matrix, mode:int):
         position_string = g.getPositionString(cur_pos)
         if position_string in maze_graph.dict:
             dist = g.getDistance(cur_pos[3], most_recent.pos, cur_pos)
-            most_recent.update_edge(cur_pos[3], g.Edge(maze_graph.dict[position_string], dist), g.DEPARTING)
-            maze_graph.dict[position_string].update_edge(cur_pos[3], g.Edge(most_recent, dist), g.APPROACHING)
+            most_recent.update_edge(cur_pos[3], g.Edge(maze_graph.dict[position_string], dist))
             most_recent = maze_graph.dict[position_string]
 
         iters-=1
@@ -309,7 +313,7 @@ def Carve(matrix, mode:int):
 
 #----- MESH -----
 #adapted from an ai summary, might be buggy
-def CreateMesh(matrix, model_name: str):
+def CreateMesh(matrix, graph, model_name: str):
     # Extract surface mesh using Marching Cubes
     verts, faces, normals, values = measure.marching_cubes(matrix, level=0.5)
 
@@ -319,6 +323,9 @@ def CreateMesh(matrix, model_name: str):
     # Export to STL or OBJ (Gazebo supports STL, OBJ, and DAE)
     outputfile = model_name + ".stl"
     mesh.export(outputfile)
+
+    with open(f"{model_name}.pkl", "wb") as file:
+        pickle.dump(graph, file)
 
 #----- VISUALIZER -----
 def Vis(matrix, name, flag):
@@ -338,4 +345,6 @@ def Vis(matrix, name, flag):
     ax.set_title("Carver: Test" + name + "Demo")
     plt.savefig("Test "+name+".png")
     if flag:
-        plt.show() 
+        plt.show()
+
+
