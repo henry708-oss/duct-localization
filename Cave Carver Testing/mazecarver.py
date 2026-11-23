@@ -2,16 +2,17 @@
 #
 # Authored by Zach Strahan
 #
-#
+# Graph construction logic by Kellen Henry
 
 import sys
+import pickle
 import random
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 import trimesh as tri
 from skimage import measure
-
+import graph as g
 
 #----- BEARING -----
 def _GetNewBearing():
@@ -217,18 +218,46 @@ def Carve(matrix, mode:int):
     #always starts drilling into the cube
     cur_bearing = 3
     cur_pos = [cur_x, cur_y, cur_z, cur_bearing]
-    set_pos = cur_pos
+    set_pos = cur_pos.copy()
     #print(cur_pos)
 
     for i in range(5):
-        _Bore(matrix,set_pos,shape, mode)
+        _Bore(matrix,set_pos, shape, mode)
         set_pos[1]-=1
+
+    position_string = g.getPositionString(set_pos)
+    maze_graph = g.Graph({
+                position_string: g.Node(set_pos.copy())
+                })
+
+    most_recent = maze_graph.dict[position_string]
+
+    maze_graph.start = most_recent
+    
+    #add node following the short path from entrace, only instance where a node thats
+    #not necessarily an intersection is created
+
+    new = g.Node(cur_pos.copy())
+
+
+    #maybe this is clunky, but adds new node to the node youre departing from and node you're 
+    #approaching seperately 
+    #im just trying to get this code pushed and documented but later ill update this
+    #so that one function call updates the edge for both nodes
+    most_recent.update_edge(3, g.Edge(new, 5))
+
+    most_recent = new
 
     running = True
     canTurn = False
     iters = math.floor(min(shape)**1.65)#based on visuals, this ration seems good.
     #print(iters)
     while(running):
+        #keeps track of old position to in order to leave the base code as untouched as possible
+        #If a turn happens will take old position and leave a node there since that is the
+        #actual intersection point
+        old_pos = cur_pos.copy()
+
         turnBias = random.randint(0,4) #about a %20 chance to fork path on each iteration
         match turnBias:                #creates a bias toward straight channels
             case 4:
@@ -237,15 +266,54 @@ def Carve(matrix, mode:int):
                 canTurn = False
             case _:
                 _Walk(cur_pos, canTurn, shape)
+        
         _Bore(matrix, cur_pos, shape, mode)
+
+        #check if a turn happened ie old bearing != new bearing
+        didTurn = False
+        if(old_pos[3] != cur_pos[3]):
+            didTurn = True
+        
+        if (didTurn):
+            #if we turned, add a node at the intersection point to the graph
+            #also check if there's already node there
+            position_string = g.getPositionString(old_pos)
+            if position_string in maze_graph.dict:
+                new = maze_graph.dict[position_string]
+            else:
+                new = g.Node(old_pos.copy())
+                maze_graph.dict[position_string] = new
+
+                # i realized we also need to check every axis of the new node for previously carved
+                # paths it may intersect, check axis will do this and update edges accordingly
+                g.checkAxis(matrix, maze_graph, new, 0, mode)
+                g.checkAxis(matrix, maze_graph, new, 1, mode)
+                g.checkAxis(matrix, maze_graph, new, 2, mode)
+
+            #distance needs the shared axis to calculate distance
+            #which is the bearing of old_pos as that is the axis coming from the most recent met/placed node
+            dist = g.getDistance(old_pos[3], most_recent.pos, old_pos)
+            most_recent.update_edge(old_pos[3], g.Edge(new, dist))
+            most_recent = new
+
+        # this is outside a conditional in the case that we turn and place a node at oldpos
+        # but theres also a previously existing node at the place we just walked to
+
+        position_string = g.getPositionString(cur_pos)
+        if position_string in maze_graph.dict:
+            dist = g.getDistance(cur_pos[3], most_recent.pos, cur_pos)
+            most_recent.update_edge(cur_pos[3], g.Edge(maze_graph.dict[position_string], dist))
+            most_recent = maze_graph.dict[position_string]
+
         iters-=1
         if iters < 0:
             running = False
-    return matrix
+
+    return matrix, maze_graph
 
 #----- MESH -----
 #adapted from an ai summary, might be buggy
-def CreateMesh(matrix, model_name: str):
+def CreateMesh(matrix, graph, model_name: str):
     # Extract surface mesh using Marching Cubes
     verts, faces, normals, values = measure.marching_cubes(matrix, level=0.5)
 
@@ -255,6 +323,9 @@ def CreateMesh(matrix, model_name: str):
     # Export to STL or OBJ (Gazebo supports STL, OBJ, and DAE)
     outputfile = model_name + ".stl"
     mesh.export(outputfile)
+
+    with open(f"{model_name}.pkl", "wb") as file:
+        pickle.dump(graph, file)
 
 #----- VISUALIZER -----
 def Vis(matrix, name, flag):
@@ -274,4 +345,6 @@ def Vis(matrix, name, flag):
     ax.set_title("Carver: Test" + name + "Demo")
     plt.savefig("Test "+name+".png")
     if flag:
-        plt.show() 
+        plt.show()
+
+
