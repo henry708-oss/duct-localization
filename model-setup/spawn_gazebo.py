@@ -6,6 +6,7 @@ import random
 import math
 import numpy as np
 import subprocess
+import time
 # import matplotlib.pyplot as plt
 # import trimesh as tri
 # from skimage import measure
@@ -20,6 +21,14 @@ proj_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(proj_root / "Cave Carver Testing"))
 
 import mazecarver as mz
+
+models_path = proj_root.parent / "mrs_uav_gazebo_simulator" / "models"
+
+os.environ["GZ_SIM_RESOURCE_PATH"] = (
+    str(models_path) + os.pathsep
+    + str(proj_root / "model-setup") + os.pathsep
+    + os.environ.get("GZ_SIM_RESOURCE_PATH", "")
+)
 
 def generate_maze(model_name):
     mode = 1
@@ -50,9 +59,11 @@ def generate_maze(model_name):
     sdf_output = model_dir / "model.sdf"
     sdf_output.write_text(sdf)
     #Taken from AI
+    subprocess.Popen(["gz", "sim", "-r", "empty.sdf"])
+    time.sleep(5)
     for name, path, position in [
         (model_name, sdf_output, (0, 0, 0)),
-        ("x500", Path.home() / "x500.sdf", spawn_position)
+        ("x500", proj_root.parent / "x500.sdf", spawn_position)
     ]:
         x, y, z = position
         request = (
@@ -68,7 +79,7 @@ def generate_maze(model_name):
             "--timeout", "5000",
             "--req", request
         ], check=True)
-    #(model_dir / "model.sdf").write_text(sdf)
+    (model_dir / "model.sdf").write_text(sdf)
 
 # to be implemented
 def random_spawn(matrix):
