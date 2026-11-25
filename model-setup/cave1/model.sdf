@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="cave1">
+    <!-- Set to true if it shouldn't move or react to gravity -->
+    <static>true</static> 
+
+    <link name="base_link">
+      <!-- Offset position (x y z r p y) of the link relative to model origin -->
+      <pose>0 0 0 0 0 0</pose>
+
+
+
+      <!-- 1. Collision boundaries (Handles physical interactions) -->
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <!-- Relative URI syntax based on Gazebo model folder structure -->
+            <uri>model://cave1/meshes/model.stl</uri>
+            <!-- STL files are often modeled in mm. Scale to meters (0.001) if necessary -->
+            <scale>0.001 0.001 0.001</scale> 
+          </mesh>
+        </geometry>
+      </collision>
+
+      <!-- 2. Visual appearance (What you see in the simulator) -->
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cave1/meshes/model.stl</uri>
+            <scale>1.0 1.0 1.0</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
